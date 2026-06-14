@@ -168,3 +168,8 @@ What was adjusted during implementation:
 - Additional runtime checks:
 	- `python agent.py` happy path and no-results path.
 	- Instrumented verification showed exact state handoff (`selected_item` and `outfit_suggestion`) between tool calls.
+	- Tried an out-of-domain query (`how is the weather`) and still received a fashion output.
+
+### Note on out-of-domain queries
+
+This is a known limitation of the current keyword-overlap search approach, not a crash. Because there is no intent classifier yet, some non-fashion queries can still overlap with common words in listing text and produce a result. A stronger production behavior would be to add intent detection (fashion vs non-fashion) and return an early message like "I can only help with clothing/thrift searches" when the query is out of scope.
