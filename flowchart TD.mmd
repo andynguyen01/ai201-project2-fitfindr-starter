@@ -1,0 +1,32 @@
+flowchart TD
+    U([User query\ndescription · size · max_price])
+    U --> SL
+
+    subgraph PL["run_agent() — Planning Loop"]
+        SL["search_listings(description, size, max_price)"]
+        SL --> CHK{results == empty?}
+
+        CHK -- "Yes" --> ERR["session[error] =\n'No listings found…'\nreturn session"]
+
+        CHK -- "No" --> ST1["session[results] = results\nsession[selected_item] = results[0]"]
+        ST1 --> SO["suggest_outfit(selected_item, wardrobe)"]
+
+        SO --> CHK2{wardrobe empty?}
+        CHK2 -- "Yes" --> WE["Prepend '(No wardrobe on file)'\nto LLM response"]
+        CHK2 -- "No" --> ST2
+        WE --> ST2["session[outfit_suggestion] = '…'"]
+
+        ST2 --> CF["create_fit_card(outfit_suggestion, selected_item)"]
+        CF --> CHK3{outfit empty?}
+        CHK3 -- "Yes" --> OE["return error string\n(no LLM call, no crash)"]
+        CHK3 -- "No" --> ST3["session[fit_card] = '…'\nreturn session"]
+    end
+
+    ST3 --> APP
+    ERR --> APP
+
+    subgraph APP["app.py — handle_query()"]
+        P1["Listing panel\n← session[selected_item]\nor session[error]"]
+        P2["Outfit panel\n← session[outfit_suggestion]"]
+        P3["Fit Card panel\n← session[fit_card]"]
+    end
