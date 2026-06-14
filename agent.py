@@ -18,6 +18,8 @@ Usage (once implemented):
     print(result["error"])   # None on success
 """
 
+import re
+
 from tools import search_listings, suggest_outfit, create_fit_card
 
 
@@ -36,6 +38,7 @@ def _new_session(query: str, wardrobe: dict) -> dict:
     return {
         "query": query,              # original user query
         "parsed": {},                # extracted description / size / max_price
+        "results": [],               # list of matching listing dicts
         "search_results": [],        # list of matching listing dicts
         "selected_item": None,       # top result, passed into suggest_outfit
         "wardrobe": wardrobe,        # user's wardrobe dict
@@ -92,9 +95,68 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     Before writing code, complete the Planning Loop and State Management sections
     of planning.md — your implementation should match what you described there.
     """
-    # TODO: implement the planning loop
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+
+    # Step 2: Parse a simple description/size/max_price triple from the query.
+    raw_query = query or ""
+    query_lower = raw_query.lower()
+
+    max_price = None
+    price_match = re.search(r"under\s*\$?\s*(\d+(?:\.\d+)?)", query_lower)
+    if not price_match:
+        price_match = re.search(r"\$\s*(\d+(?:\.\d+)?)", query_lower)
+    if price_match:
+        max_price = float(price_match.group(1))
+
+    size = None
+    size_match = re.search(r"\bsize\s*[:=]?\s*([a-z0-9/.-]+)", query_lower)
+    if size_match:
+        size = size_match.group(1).upper()
+
+    description = raw_query
+    description = re.sub(r"under\s*\$?\s*\d+(?:\.\d+)?", "", description, flags=re.IGNORECASE)
+    description = re.sub(r"\$\s*\d+(?:\.\d+)?", "", description, flags=re.IGNORECASE)
+    description = re.sub(r"\bsize\s*[:=]?\s*[a-z0-9/.-]+", "", description, flags=re.IGNORECASE)
+    description = re.sub(r"[\s,]+", " ", description).strip(" .,")
+    if not description:
+        description = raw_query.strip()
+
+    session["parsed"] = {
+        "description": description,
+        "size": size,
+        "max_price": max_price,
+    }
+
+    # Step 3: Search and branch early on no results.
+    results = search_listings(description=description, size=size, max_price=max_price)
+    session["results"] = results
+    session["search_results"] = results
+
+    if not results:
+        size_text = size if size else "any size"
+        price_text = f"${max_price:.2f}" if max_price is not None else "any budget"
+        session["error"] = (
+            f"No listings found for '{description}' in size {size_text} under {price_text}. "
+            "Try broadening your search terms, adjusting the size, or raising your budget."
+        )
+        return session
+
+    # Step 4: Select top result.
+    session["selected_item"] = results[0]
+
+    # Step 5: Generate outfit suggestion.
+    session["outfit_suggestion"] = suggest_outfit(
+        new_item=session["selected_item"],
+        wardrobe=session["wardrobe"],
+    )
+
+    # Step 6: Generate fit card from outfit + selected item.
+    session["fit_card"] = create_fit_card(
+        outfit=session["outfit_suggestion"],
+        new_item=session["selected_item"],
+    )
+
+    # Step 7: Return final session state.
     return session
 
 
