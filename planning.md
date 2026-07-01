@@ -116,7 +116,7 @@ For each tool, describe the specific failure mode you're handling and what the a
 
 ## Architecture
 
-![Session Outfit Flow](Session Outfit Flow.png)
+![Session Outfit Flow](SessionOutfitFlow.png)
 
 ---
 
